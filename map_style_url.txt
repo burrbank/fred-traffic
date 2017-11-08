@@ -1,0 +1,1 @@
+https://api.mapbox.com/styles/v1/burrbank/cj9o88ylz45v22rt36ggcv0e9/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYnVycmJhbmsiLCJhIjoiY2o5bzdxbGFnNWRkOTJ3bXE2MjZxaHI0NyJ9.E0z0htY-RD4apyrQO3XuOQ
