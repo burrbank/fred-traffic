@@ -93,6 +93,9 @@ map <- leaflet(data = df_in_top5, options = leafletOptions(zoomControl=FALSE, at
 
 mapshot(map, file='map.png',vheight=3000, vwidth=6000)
 
+
+type_data <- df_in_top5 %>% group_by(Type, inter_id) %>% summarise(total = n()) %>% left_join(top5, by="inter_id") %>% mutate(average=total/collisions)
+
 p1 <- ggplot(data = df_in_top5, aes(x=Type, fill=inter_id))
 p1 <- p1 + geom_bar() + scale_fill_manual(values = scale) + my_theme() + facet_grid(.~inter_id) + theme(legend.position = "none")
 
