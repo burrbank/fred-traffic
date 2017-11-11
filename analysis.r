@@ -1,81 +1,108 @@
 # make infographic
 #load in packages
-library(sets)
 library(ggplot2)
 library(dplyr)
 library(leaflet)
 library(grid)
 library(gridExtra)
 library(extrafont)
+library(mapview)
+library(png)
+library(useful)
 
 map_style_url <- 'https://api.mapbox.com/styles/v1/burrbank/cj9o88ylz45v22rt36ggcv0e9/tiles/256/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYnVycmJhbmsiLCJhIjoiY2o5bzdxbGFnNWRkOTJ3bXE2MjZxaHI0NyJ9.E0z0htY-RD4apyrQO3XuOQ'
-color1 <- "#33d12e" # green
-color2 <- "#e3ea0b" # yellow
-color3 <- "#b307f7" # purple
+
+gray <- '#e2e2e3'
+dark_gray <- "#252A34"
+neon_red <- "#FF2E63"
+neon_blue <- "#08D9D6"
+
+background <- "#3a4559"
 
 # Configure Theme
 my_theme <- function() {
   theme(
     
-    plot.background = element_rect(fill = '#e2e2e3', colour = "#E2E2E3"),
-    panel.background = element_rect(fill = "#EAEAEA"),
-    axis.text = element_text(colour = "#252A34", face = "bold", family = "Ubuntu"), #change font
-    plot.title = element_text(colour = "#252A34", face = "bold", size = 18, vjust = 1, family = "Ubuntu"), #change font
-    axis.title = element_text(colour = "#252A34", face = "bold", size = 13, family = "Ubuntu"), #change font
-    panel.grid.major.x = element_line(colour = "#FF2E63"), 
+    plot.background = element_rect(fill = background, colour = background),
+    panel.background = element_rect(fill = dark_gray),
+    axis.text = element_text(colour = neon_blue, face = "bold", family = "Ubuntu"), #change font
+    plot.title = element_text(colour = neon_blue, face = "bold", size = 18, vjust = 1, family = "Ubuntu"), #change font
+    axis.title = element_text(colour = neon_blue, face = "bold", size = 13, family = "Ubuntu"), #change font
+    panel.grid.major.x = element_line(colour = neon_blue), 
     panel.grid.minor.x = element_blank(),
-    panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(colour = neon_blue),
     panel.grid.minor.y = element_blank(),
-    strip.text = element_text(family = "Ubuntu", face = "bold", colour = "#08D9D6"),
-    strip.background = element_rect(fill = "#252A34"),
-    axis.ticks = element_line(colour = "#FF2E63")
+    strip.text = element_text(family = "Ubuntu", face = "bold", colour = neon_blue),
+    strip.background = element_rect(fill = dark_gray),
+    axis.ticks = element_line(colour = neon_blue),
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5, colour = neon_blue)
   )
 }
 #load data as df
 df <- read.csv('data/traffic_accidents.csv')
-coord <- data.frame(lng=df$X, lat=df$Y)
+intersections <- readLines('data/intersection.txt')
+df <- df %>% mutate(inter_id = as.factor(intersections)) %>% rename(lng = X, lat =Y)
 
+top5 <- df %>% group_by(inter_id) %>% summarise(collisions=n()) %>% arrange(-collisions) %>% head(5)
+in_top5 <- df$inter_id %in% top5$inter_id
 
-#cluster the data points to get an aproximation of intersections
-k <- kmeans(coord, 250, nstart = 50)
-coord <- mutate(coord, cluster = k$cluster )
+df_in_top5 <- df[in_top5,] %>% mutate(inter_id = droplevels(inter_id))
+#adjust factors so that 1 is the largest group
+df_in_top5$inter_id = factor(df_in_top5$inter_id, top5$inter_id)
 
-# top5 = coord dataframe > grouped by the cluster of each point > counting the number of points in each cluster > 
-#   sorted from largest cluster to smallest > only returning the top5
-top5 <- coord %>% group_by(cluster) %>% summarise(total = n()) %>% arrange(-total) %>% head(5)
-
-in_top5 <- coord$cluster %in% top5$cluster
-top5_coord <- coord[in_top5,]
-
-color_gen <- function(top5_coord){
-  sapply(top5_coord$cluster, function(cluster){
-    if(cluster == top5$cluster[1]){
-      "red"
-    } else if(cluster == top5$cluster[2]){
-      "orange"
-    } else if(cluster == top5$cluster[3]){
-      "green"
-    } else if(cluster == top5$cluster[4]){
-      "purple"
-    } else {
-      "blue"
-    }
-  })
+top5$inter_id = droplevels(top5$inter_id)
+color_gen <- function(df_in_top5){
+   sapply(df_in_top5$inter_id, function(inter_id){
+     if(inter_id == top5$inter_id[1]){
+       "red"
+     } else if(inter_id == top5$inter_id[2]){
+       "orange"
+     } else if(inter_id == top5$inter_id[3]){
+       "green"
+     } else if(inter_id == top5$inter_id[4]){
+       "purple"
+     } else {
+       "blue"
+     }
+   })
 }
-
+#colors corrisponding to marker actuall color
+red1st <- "#C2372E"
+orange2nd <- "#D2893C"
+green3rd <- "#729E44"
+purple4th <- "#B15EA6"
+blue5th <- "#479ABB"
+scale <- c(red1st, orange2nd, green3rd, purple4th, blue5th)
+ 
+ 
 icons <- awesomeIcons(
-  icon = 'ios-close',
+  icon = 'android-radio-button-on',
   iconColor = 'black',
   library = 'ion',
-  markerColor = color_gen(top5_coord)
+  markerColor = color_gen(df_in_top5)
 )
+center <- group_by(df_in_top5, inter_id) %>% summarise(x = mean(lng), y = mean(lat))
+x <- mean(center$x)
+y <- mean(center$y)
 
 #create map
-map <- leaflet(data = top5_coord, options = leafletOptions(zoomControl=FALSE, attributionControl=FALSE)) %>%
-  setView(lng=-66.6431, lat=45.9636, zoom=13) %>%
-  addAwesomeMarkers(~lng, ~lat, icon=icons, label=~as.character(cluster)) %>%
+map <- leaflet(data = df_in_top5, options = leafletOptions(zoomControl=FALSE, attributionControl=FALSE)) %>%
+  setView(lng=x, lat=y, zoom=17) %>%
+  addAwesomeMarkers(~lng, ~lat, icon=icons) %>%
   addTiles(map_style_url)
 
-map
+mapshot(map, file='map.png',vheight=3000, vwidth=6000)
+
+p1 <- ggplot(data = df_in_top5, aes(x=Type, fill=inter_id))
+p1 <- p1 + geom_bar() + scale_fill_manual(values = scale) + my_theme() + facet_grid(.~inter_id) + theme(legend.position = "none")
 
 
+#pdf device
+pdf('poster.pdf', width=20, height=30, title="Traffic visualization", bg = background )
+#create layout
+#for map
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(6,3),width=unit(20, "inches"), height=unit(30, "inches")))
+print(p1, vp = vplayout(1, 1:2))
+grid.raster(readPNG("map.png"), vp = vplayout(2:3, 1:3))
+dev.off()
