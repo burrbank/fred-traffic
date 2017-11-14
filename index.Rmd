@@ -1,0 +1,52 @@
+---
+title: "Intersections of Note"
+author: "Ryan Porter"
+date: "November 14, 2017"
+output: 
+  ioslides_presentation
+---
+
+```{r, echo=FALSE, render=FALSE, message=FALSE }
+library(dplyr)
+library(leaflet)
+library(ggplot2)
+library(scales)
+library(tidyr)
+```
+
+## Introduction
+
+While working with this data I was interested to see if there was a way to identify common problems with intersections throughout the city.
+
+The main way to do this would be looking at how intersections look compaired to the average. So that is what I am going to look at first.
+
+## Loading data and transforming it.
+
+```{r}
+df <- read.csv('data/traffic_accidents.csv')
+intersections <- readLines('data/intersection.txt')
+
+df <- df %>% 
+  mutate(inter_id = as.factor(intersections)) %>% # Adds a new column
+  rename(lng = X, lat =Y) # Changes X and Y to lng and lat
+```
+
+First I load in the data from the fredericton collisions dataset, and then I load in a file that I created to combine point's at the same intersection.
+
+Then I tweek the dataframe a little bit, adding a column of intersection IDs to each row. Also changing X and Y to lng and lat to work better with the mapping package I use.
+
+## The average intersection
+
+[below] This chart shows the average for the entire city. The most common type of collision back ending.
+
+```{r, echo=FALSE}
+g <- ggplot(data=df, aes(x=Type, y=..count../sum(..count..))) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5), axis.title.y = element_blank()) + 
+  scale_y_continuous(labels = scales::percent)
+print(g)
+```
+
+## Digging in
+
+

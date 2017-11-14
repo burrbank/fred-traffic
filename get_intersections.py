@@ -20,5 +20,5 @@ with open('data/traffic_accidents.csv') as csvfile:
     for row in reader:
         temp = [tidy(row['Street']), tidy(row['Near'])]
         temp.sort()
-        out = '@'.join(temp)
+        out = '-'.join(temp)
         print(out, file=outfile)
