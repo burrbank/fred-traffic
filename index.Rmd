@@ -2,8 +2,7 @@
 title: "Intersections of Note"
 author: "Ryan Porter"
 date: "November 14, 2017"
-output: 
-  ioslides_presentation
+output: slidy_presentation
 ---
 
 ```{r, echo=FALSE, render=FALSE, message=FALSE }
@@ -13,9 +12,6 @@ library(ggplot2)
 library(scales)
 library(tidyr)
 library(reshape2)
-
-
-
 ```
 
 ## Introduction
@@ -97,9 +93,9 @@ It took a bit getting there but I can now map out the intersections in the 5 clu
 ## Charting the clusters
 
 Just for a quick look at the clusters his heat map goes from cyan to purple (low to high).
-```{r, echo=FALSE}
-heatmap(k$centers, col = cm.colors(256), Colv = NA,Rowv = NA)
 
+```{r, size=9}
+heatmap( k$centers)
 ```
 
 ## The top 5
