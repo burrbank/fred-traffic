@@ -140,8 +140,8 @@ center <- group_by(loc_in_top5, cluster) %>% summarise(x = mean(lng), y = mean(l
 x <- mean(center$x)
 y <- mean(center$y)
 
-map <- leaflet(data = loc_in_top5, options = leafletOptions(zoomControl=FALSE, attributionControl=FALSE)) %>%
-  setView(lng=x, lat=y, zoom=10) %>%
+map <- leaflet(data = loc_in_top5) %>%
+  setView(lng=x, lat=y, zoom=12) %>%
   addAwesomeMarkers(~lng, ~lat, icon=icons, popup=~inter_id) %>%
   addTiles()
 map
