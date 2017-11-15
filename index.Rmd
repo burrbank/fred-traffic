@@ -12,13 +12,17 @@ library(leaflet)
 library(ggplot2)
 library(scales)
 library(tidyr)
+library(reshape2)
+
+
+
 ```
 
 ## Introduction
 
 While working with this data I was interested to see if there was a way to identify common problems with intersections throughout the city.
 
-The main way to do this would be looking at how intersections look compaired to the average. So that is what I am going to look at first.
+The main way to do this would be looking at how intersections look compared to the average. So that is what I am going to look at first.
 
 ## Loading data and transforming it.
 
@@ -31,15 +35,15 @@ df <- df %>%
   rename(lng = X, lat =Y) # Changes X and Y to lng and lat
 ```
 
-First I load in the data from the fredericton collisions dataset, and then I load in a file that I created to combine point's at the same intersection.
+First I load in the data from the Fredericton collisions data set, and then I load in a file that I created to combine point's at the same intersection.
 
-Then I tweek the dataframe a little bit, adding a column of intersection IDs to each row. Also changing X and Y to lng and lat to work better with the mapping package I use.
+Then I tweak the data frame a little bit, adding a column of intersection IDs to each row. Also changing X and Y to lng and lat to work better with the mapping package I use.
 
 ## The average intersection
 
 [below] This chart shows the average for the entire city. The most common type of collision back ending.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, warning=FALSE}
 g <- ggplot(data=df, aes(x=Type, y=..count../sum(..count..))) +
   geom_bar() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5), axis.title.y = element_blank()) + 
@@ -47,6 +51,99 @@ g <- ggplot(data=df, aes(x=Type, y=..count../sum(..count..))) +
 print(g)
 ```
 
-## Digging in
+## Data wrangling
+I think my next step is looking at how other intersections compare to the average intersection. and then cluster intersections that appear to be similar. So I will reshape the data to fit that need.
+```{r, message=FALSE}
+#get a count of each type at each intersection.
+inter_by_type <- dcast(df, inter_id ~ Type, fun.aggregate = length)
+#select only the number columns of inter_by_type.
+nums <- sapply(inter_by_type, is.numeric)
+total <- rowSums(inter_by_type[ ,nums])
+#create new dataframe with the averages for each intersection.
+inter_by_type_avg <- inter_by_type
+inter_by_type_avg[ ,nums] <- inter_by_type[ ,nums] / total
+```
+This will give us a data frame containing averages for each type of collision for all of Fredericton (at least the ones that show up in the data anyway!)
 
+## Data wrangling (cont.)
+Next I want to cluster the data by similar intersections and map the data. I'm going to look at 5 largest clusters of 15.
+
+```{r}
+#Run kmeans clustering with 15 centers
+k <- kmeans(inter_by_type_avg[ ,nums], 15)
+inter_by_type_avg <- mutate(inter_by_type_avg, cluster = k$cluster)
+
+#get geo locations of each intersection
+loc <- df %>% 
+  group_by(inter_id) %>% 
+  summarise(lng = mean(lng), lat = mean(lat)) %>% 
+  left_join(inter_by_type_avg, by="inter_id")
+
+# get top 5
+top5 <- loc %>%
+  group_by(cluster) %>% summarise(total=n()) %>%
+  arrange(-total) %>% head(5)
+
+```
+## Data wrangling (cont.)
+
+```{r}
+# select only the top 5 clusters
+in_top5 <- loc$cluster %in% top5$cluster
+loc_in_top5 <- loc[in_top5,]
+```
+It took a bit getting there but I can now map out the intersections in the 5 clusters that cover the most intersections.
+
+## Charting the clusters
+
+Just for a quick look at the clusters his heat map goes from cyan to purple (low to high).
+```{r, echo=FALSE}
+heatmap(k$centers, col = cm.colors(256), Colv = NA,Rowv = NA)
+
+```
+
+## The top 5
+
+```{r}
+print(top5)
+```
+these will correspond to red, yellow, green, blue and purple respectively on the next side.
+
+
+## Mapped out
+
+```{r, echo=FALSE}
+color_gen <- function(loc_in_top5){
+   sapply(loc_in_top5$cluster, function(cluster){
+     if(cluster == top5$cluster[1]){
+       "red"
+     } else if(cluster == top5$cluster[2]){
+       "orange"
+     } else if(cluster == top5$cluster[3]){
+       "green"
+     } else if(cluster == top5$cluster[4]){
+       "blue"
+     } else {
+       "purple"
+     }
+   })
+}
+
+icons <- awesomeIcons(
+  icon = 'android-radio-button-on',
+  iconColor = 'black',
+  library = 'ion',
+  markerColor = color_gen(loc_in_top5)
+)
+
+center <- group_by(loc_in_top5, cluster) %>% summarise(x = mean(lng), y = mean(lat))
+x <- mean(center$x)
+y <- mean(center$y)
+
+map <- leaflet(data = loc_in_top5, options = leafletOptions(zoomControl=FALSE, attributionControl=FALSE)) %>%
+  setView(lng=x, lat=y, zoom=17) %>%
+  addAwesomeMarkers(~lng, ~lat, icon=icons, popup=~inter_id) %>%
+  addTiles()
+map
+```
 
